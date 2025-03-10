@@ -134,6 +134,26 @@ def documents_download(driver):
                 driver.swipe(500, 1500, 500, 500, 800)
                 time.sleep(1)
 
+def download_missing_files(driver, missing_files):
+    """
+    Повторно ищет и скачивает недостающие файлы.
+    """
+    for doc_text in missing_files:
+        while True:
+            try:
+                element = WebDriverWait(driver, 3).until(
+                    EC.presence_of_element_located((AppiumBy.XPATH, f'//android.widget.TextView[@text="{doc_text}"]'))
+                )
+                element.click()
+                print(f"🔄 Повторная загрузка: {doc_text}")
+                time.sleep(2)  # Даем время на скачивание
+                break
+            except:
+                print(f"📜 Скроллим для поиска: {doc_text}")
+                driver.swipe(500, 1500, 500, 500, 800)  # Скроллим вниз
+                time.sleep(1)
+                driver.swipe(500, 500, 500, 1500, 800)  # Скроллим вверх
+                time.sleep(1)
 
 def check_downloaded_files():
     expected_files = [
@@ -165,27 +185,24 @@ def check_downloaded_files():
     ]
 
     download_path = "/sdcard/Android/data/ru.adengi/files/Download/"
-
-
-    timeout = 15
+    timeout = 15  # Максимальное время ожидания загрузки файлов
     start_time = time.time()
 
     while time.time() - start_time < timeout:
         result = subprocess.run(["adb", "shell", "ls", download_path], capture_output=True, text=True)
         downloaded_files = result.stdout.splitlines()
 
-        found_files = [file for file in expected_files if file in downloaded_files]
         missing_files = [file for file in expected_files if file not in downloaded_files]
 
         if not missing_files:
-            print(f" Все файлы найдены: {found_files}")
-            return
+            print("✅ Все файлы успешно скачаны.")
+            return []
 
+        print(f"⏳ Ожидание загрузки... Недостающие файлы: {missing_files}")
         time.sleep(2)
 
-
-    if missing_files:
-        pytest.fail(f" Не все файлы скачаны. Отсутствуют: {missing_files}")
+    print(f"⚠️ Таймаут! Следующие файлы не были найдены: {missing_files}")
+    return missing_files  # Возвращаем список отсутствующих файлов
 
 
 #Тест онбординг
