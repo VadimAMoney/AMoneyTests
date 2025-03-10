@@ -14,8 +14,7 @@ capabilities = {
     "automationName": "uiautomator2",
     "deviceName": "emulator-5554"
 }
-#"appPackage": "com.android.documentsui",  # Пакет приложения "Files" на Android
-    #"appActivity": ".DownloadsActivity",
+
 
 
 capabilities_options = UiAutomator2Options().load_capabilities(capabilities)
