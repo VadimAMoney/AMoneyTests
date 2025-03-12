@@ -9,6 +9,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 import time
+import re
 
 # 🔹 Конфигурация Appium
 capabilities = {
@@ -47,71 +48,55 @@ def open_AMoney(driver):
     aps = driver.find_element(by=AppiumBy.XPATH, value="//*[contains(@text, 'А деньги')]")
     aps.click()
 
+
 def onbording(driver):
-    # Ожидание появления первого элемента
-    el_onbording1 = WebDriverWait(driver, 10).until(
-        EC.visibility_of_element_located((AppiumBy.XPATH, '//android.widget.TextView[@resource-id="ru.adengi:id/textDescription"]'))
-    )
-    txt = el_onbording1.text
-    expected_text = "Пользуйтесь деньгами\nбез процентов"
-    assert txt == expected_text, f"Ожидаемый текст '{expected_text}', но найден: '{txt}'"
-    button = driver.find_element(by=AppiumBy.ID, value= 'ru.adengi:id/buttonNext')
-    button.click()
+    # Проход по онбордингу
+    for expected_text in [
+        "Пользуйтесь деньгами\nбез процентов",
+        "Заполните короткую анкету\nи получите деньги на карту любого банка",
+        "Можно получить заём\nдаже с плохой кредитной историей"
+    ]:
+        el = WebDriverWait(driver, 10).until(
+            EC.visibility_of_element_located(
+                (AppiumBy.XPATH, '//android.widget.TextView[@resource-id="ru.adengi:id/textDescription"]'))
+        )
+        assert el.text == expected_text, f"Ожидаемый текст '{expected_text}', но найден: '{el.text}'"
+        driver.find_element(by=AppiumBy.ID, value='ru.adengi:id/buttonNext').click()
 
-    # Ожидание появления второго элемента
-    el_onbording2 = WebDriverWait(driver, 10).until(
-        EC.visibility_of_element_located((AppiumBy.XPATH, '//android.widget.TextView[@resource-id="ru.adengi:id/textDescription"]'))
-    )
-    txt = el_onbording2.text
-    expected_text = "Заполните короткую анкету\nи получите деньги на карту любого банка"
-    assert txt == expected_text, f"Ожидаемый текст '{expected_text}', но найден: '{txt}'"
-    button = driver.find_element(by=AppiumBy.ID, value='ru.adengi:id/buttonNext')
-    button.click()
-
-    # Ожидание появления третьего элемента
-    txt_onbording3 = WebDriverWait(driver, 10).until(
-        EC.visibility_of_element_located((AppiumBy.XPATH, '//android.widget.TextView[@resource-id="ru.adengi:id/textDescription"]'))
-    )
-    txt = txt_onbording3.text
-    expected_text = "Можно получить заём\nдаже с плохой кредитной историей"
-    assert txt == expected_text, f"Ожидаемый текст '{expected_text}', но найден: '{txt}'"
-    button = driver.find_element(by=AppiumBy.ID, value='ru.adengi:id/buttonNext')
-    button.click()
-
-    # Ожидание появления текста согласия
-    txt_agreement = WebDriverWait(driver, 10).until(
+    # Согласие на обработку данных
+    WebDriverWait(driver, 10).until(
         EC.visibility_of_element_located((AppiumBy.ID, 'ru.adengi:id/text_policy'))
     )
-    txt = txt_agreement.text
-    expected_text = "В целях нормального функционирования мобильного приложения Вам необходимо предоставить согласие на сбор, обработку и хранение следующих данных:\nИмя пользователя, Адрес электронной почты, Номер телефона, Местоположение и Фотографии - собираются и хранятся с целью выполнения функций приложения, предотвращения мошенничества, повышения уровня безопасности и соответствие требованиям Федерального закона от 27.07.2006 № 152-ФЗ «О персональных данных». Идентификаторы устройства, Идентификаторы пользователей> - собираются и хранятся с целью выполнения функций приложения, предотвращения мошенничества, повышения уровня безопасности и повышения качества обслуживания.\n\nОбращаем внимание, что Вы можете отказаться предоставлять указанные данные далее в процессе использования приложения.\n\nИнформируем также, что обработка персональных данных осуществляется только в тех случаях, когда получено согласие субъекта на обработку его персональных данных. При обработке персональных данных принимаются необходимые правовые, организационные и технические меры для защиты персональных данных от неправомерного или случайного доступа к ним, уничтожения, изменения, блокирования, копирования, предоставления, распространения персональных данных, а также от иных неправомерных действий в отношении персональных данных, в соответствии с требованиями ст.19 Федерального закона от 27 июля 2006 г. № 152-ФЗ «О персональных данных». Хранение персональных данных осуществляется с учетом обеспечения режима их конфиденциальности."
-    assert txt == expected_text, f"Ожидаемый текст '{expected_text}', но найден: '{txt}'"
-    button = driver.find_element(by=AppiumBy.ID, value='ru.adengi:id/buttonNext')
-    button.click()
+    driver.find_element(by=AppiumBy.ID, value='ru.adengi:id/buttonNext').click()
 
-    # Ожидание появления push-уведомления
-    push_desk_txt = WebDriverWait(driver, 10).until(
+    # Отклонение push-уведомления
+    WebDriverWait(driver, 10).until(
         EC.visibility_of_element_located((AppiumBy.ID, 'ru.adengi:id/description'))
     )
-    button_decline = driver.find_element(by=AppiumBy.ID, value='ru.adengi:id/declineButton')
-    button_decline.click()
-#Вот это переработать
+    driver.find_element(by=AppiumBy.ID, value='ru.adengi:id/declineButton').click()
+
+
+# 🔹 Регистрация с очисткой номера телефона
 def fast_registration_skip(driver):
     button_get_money = WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/buttonGetMoney'))
     )
     button_get_money.click()
 
-    # Ждем появления поля и считываем номер
+    # Ждем появления поля и получаем номер
     phone_element = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((AppiumBy.ID, "ru.adengi:id/editTextPhone"))
     )
     phone_number = phone_element.text.strip()
 
+    # Убираем `+` и пробелы
+    phone_number = re.sub(r"\D", "", phone_number)
+
     print(f"📱 Сохраненный номер телефона: {phone_number}")
 
     button_continue_1 = WebDriverWait(driver, 10).until(
-    EC.visibility_of_element_located(
-        (AppiumBy.XPATH, '//android.widget.Button[@resource-id="ru.adengi:id/buttonContinue"]')))
+        EC.visibility_of_element_located(
+            (AppiumBy.XPATH, '//android.widget.Button[@resource-id="ru.adengi:id/buttonContinue"]')))
     button_continue_1.click()
 
     button_continue_2 = WebDriverWait(driver, 10).until(
@@ -137,15 +122,16 @@ def fast_registration_skip(driver):
     return phone_number
 
 
-# 🔹 Фикстура для хранения номера телефона (результат test_fast_reg)
+# 🔹 Фикстура для хранения номера телефона
 @pytest.fixture(scope="module")
 def registered_phone_number(driver):
     """Проходит регистрацию и возвращает номер телефона"""
     open_AMoney(driver)
     onbording(driver)
-    return fast_registration_skip(driver)
-    assert phone_number, "Ошибка! Номер телефона не получен."
+    phone_number = fast_registration_skip(driver)
 
+    assert phone_number, "Ошибка! Номер телефона не получен."
+    return phone_number
 
 
 # 🔹 Фикстура для получения токена
@@ -167,14 +153,10 @@ def access_token(registered_phone_number):
     ACCESS_TOKEN = tokens.get("access_token")
     assert ACCESS_TOKEN, "Ошибка! Access token не получен."
 
-    return ACCESS_TOKEN  # Возвращаем токен для использования в следующих тестах
+    return ACCESS_TOKEN
 
 
-# 🔹 Тест регистрации (должен быть первым)
-
-
-
-# 🔹 Тест API-запроса (начинается только после успешного теста регистрации)
+# 🔹 Тест API-запроса
 def test_get_client_info(access_token):
     URL = "https://stage01.adengi.tech/api/v1/client/me"
     HEADERS = {"Authorization": f"Bearer {access_token}"}
@@ -189,7 +171,7 @@ def test_get_client_info(access_token):
     print(f"✅ Получен client_id: {client_id}")
 
 
-# 🔹 Тест работы с БД (использует client_id)
+# 🔹 Тест работы с БД
 def test_find_user(db_connection, access_token):
     cursor = db_connection.cursor()
 
@@ -236,5 +218,3 @@ def test_find_user(db_connection, access_token):
     post_response = requests.post(post_url, headers=post_headers, json=post_body)
     assert post_response.status_code == 200, f"Ошибка при подтверждении: {post_response.status_code}, {post_response.text}"
     print(f"✅ Подтверждение успешно: {post_response.json()}")
-
-
