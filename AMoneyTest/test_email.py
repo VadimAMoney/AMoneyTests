@@ -33,10 +33,10 @@ def driver():
 @pytest.fixture(scope="module")
 def db_connection():
     conn = psycopg2.connect(
-        dbname="test_email",
-        user="postgres",
-        password="qwerty123",
-        host="localhost",
+        dbname="adengi",
+        user="adengi_team",
+        password="xpt2od18FxmZPeyw",
+        host="stage01.adengi.tech",
         port="5432"
     )
     yield conn
@@ -133,6 +133,21 @@ def registered_phone_number(driver):
     assert phone_number, "Ошибка! Номер телефона не получен."
     return phone_number
 
+def check_text_not_present(driver):
+    # Ожидаем появления кнопки уведомлений и кликаем по ней
+    button_notification = WebDriverWait(driver, 10).until(
+        EC.visibility_of_element_located((AppiumBy.ID, 'ru.adengi:id/nav_notification')))
+    button_notification.click()
+
+    try:
+        # Ожидаем, что элемент с данным локатором НЕ будет видим в течение 10 секунд
+        WebDriverWait(driver, 10).until(EC.invisibility_of_element_located(
+            (AppiumBy.XPATH, '//android.widget.TextView[@resource-id="ru.adengi:id/textTitle"]')))
+        print("Надпись отсутствует на экране.")
+    except TimeoutException:
+        # Если элемент видим, то выбрасывается исключение, значит он всё же был найден
+        print("Надпись всё ещё видна на экране.")
+
 
 # 🔹 Фикстура для получения токена
 @pytest.fixture(scope="module")
@@ -184,8 +199,9 @@ def test_find_user(db_connection, access_token):
 
     assert client_id, "Ошибка! client_id не получен."
 
+    #название таблиц исправить!!!
     # Поиск пользователя в БД
-    cursor.execute("SELECT id, client_id, email, type FROM email_confirmation WHERE client_id = %s", (client_id,))
+    cursor.execute("SELECT * FROM email_confirmations WHERE client_id = %s", (client_id,))
     user = cursor.fetchone()
     assert user, "Ошибка! Пользователь не найден в email_confirmation."
 
@@ -194,7 +210,7 @@ def test_find_user(db_connection, access_token):
 
     # Получаем код подтверждения
     cursor.execute(
-        "SELECT id, email_confirmation_id, code FROM email_confirmation_codes WHERE email_confirmation_id = %s",
+        "SELECT * FROM email_confirmation_codes WHERE email_confirmation_id = %s",
         (email_confirmation_id,))
     verification = cursor.fetchone()
     assert verification, "Ошибка! Код подтверждения не найден."
@@ -218,3 +234,5 @@ def test_find_user(db_connection, access_token):
     post_response = requests.post(post_url, headers=post_headers, json=post_body)
     assert post_response.status_code == 200, f"Ошибка при подтверждении: {post_response.status_code}, {post_response.text}"
     print(f"✅ Подтверждение успешно: {post_response.json()}")
+
+    check_text_not_present(driver)
