@@ -11,7 +11,7 @@ from selenium.common.exceptions import TimeoutException
 import time
 import re
 
-# 🔹 Конфигурация Appium
+# Конфигурация Appium
 capabilities = {
     "platformName": "Android",
     "automationName": "uiautomator2",
@@ -21,7 +21,7 @@ capabilities_options = UiAutomator2Options().load_capabilities(capabilities)
 appium_server_url = "http://localhost:4723"
 
 
-# 🔹 Фикстура для драйвера
+#  Фикстура для драйвера
 @pytest.fixture(scope="module")
 def driver():
     app_driver = webdriver.Remote(appium_server_url, options=capabilities_options)
@@ -29,7 +29,7 @@ def driver():
     app_driver.quit()
 
 
-# 🔹 Фикстура для БД
+#  Фикстура для БД
 @pytest.fixture(scope="module")
 def db_connection():
     conn = psycopg2.connect(
@@ -76,7 +76,7 @@ def onbording(driver):
     driver.find_element(by=AppiumBy.ID, value='ru.adengi:id/declineButton').click()
 
 
-# 🔹 Регистрация с очисткой номера телефона
+#  Регистрация с очисткой номера телефона
 def fast_registration_skip(driver):
     button_get_money = WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/buttonGetMoney'))
@@ -122,7 +122,7 @@ def fast_registration_skip(driver):
     return phone_number
 
 
-# 🔹 Фикстура для хранения номера телефона
+#  Фикстура для хранения номера телефона
 @pytest.fixture(scope="module")
 def registered_phone_number(driver):
     """Проходит регистрацию и возвращает номер телефона"""
@@ -149,7 +149,7 @@ def check_text_not_present(driver):
         print("Надпись всё ещё видна на экране.")
 
 
-# 🔹 Фикстура для получения токена
+#  Фикстура для получения токена
 @pytest.fixture(scope="module")
 def access_token(registered_phone_number):
     TOKEN_URL = "https://stage01.adengi.tech/api/v1/oauth/token"
@@ -171,7 +171,7 @@ def access_token(registered_phone_number):
     return ACCESS_TOKEN
 
 
-# 🔹 Тест API-запроса
+#  Тест API-запроса
 def test_get_client_info(access_token):
     URL = "https://stage01.adengi.tech/api/v1/client/me"
     HEADERS = {"Authorization": f"Bearer {access_token}"}
@@ -186,7 +186,7 @@ def test_get_client_info(access_token):
     print(f"✅ Получен client_id: {client_id}")
 
 
-# 🔹 Тест работы с БД
+#  Тест работы с БД
 def test_find_user(db_connection, access_token):
     cursor = db_connection.cursor()
 
@@ -199,7 +199,7 @@ def test_find_user(db_connection, access_token):
 
     assert client_id, "Ошибка! client_id не получен."
 
-    #название таблиц исправить!!!
+
     # Поиск пользователя в БД
     cursor.execute("SELECT * FROM email_confirmations WHERE client_id = %s", (client_id,))
     user = cursor.fetchone()
