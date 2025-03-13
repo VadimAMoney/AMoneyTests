@@ -92,7 +92,7 @@ def fast_registration_skip(driver):
     # Убираем `+` и пробелы
     phone_number = re.sub(r"\D", "", phone_number)
 
-    print(f"📱 Сохраненный номер телефона: {phone_number}")
+    print(f" Сохраненный номер телефона: {phone_number}")
 
     button_continue_1 = WebDriverWait(driver, 10).until(
         EC.visibility_of_element_located(
