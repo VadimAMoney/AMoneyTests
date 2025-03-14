@@ -204,7 +204,7 @@ def driver():
     driver.quit()
 
 
-def test_slider_and_text_match(appium_driver):
+def slider_and_text_match(appium_driver):
     wait = WebDriverWait(appium_driver, 10)
 
     # Выбираем именно SeekBar (ползунок), исключая ProgressBar
@@ -249,7 +249,7 @@ def test_slider_and_text_match(appium_driver):
     # Двигаем ползунок к минимальному значению, если он не на 2000
     if current_value != min_value:
         actions = ActionChains(appium_driver)
-        actions.drag_and_drop_by_offset(slider, -500, 0).perform()
+        actions.drag_and_drop_by_offset(slider, -450, 0).perform()
         appium_driver.implicitly_wait(1)
 
         content_desc = slider.get_attribute("content-desc")
@@ -261,7 +261,7 @@ def test_slider_and_text_match(appium_driver):
         assert current_value == min_value, f"Expected 2000, but got {current_value}"
 
     # Двигаем ползунок вперед по пикселям с проверкой
-    move_by_pixels = 10  # Уменьшаем смещение на 10 пикселей за шаг для точности
+    move_by_pixels = 8  # Уменьшаем смещение на 10 пикселей за шаг для точности
 
     for i in range(num_steps):
         # Получаем текущие координаты ползунка
@@ -298,6 +298,7 @@ def test_field_value_edit(appium_driver):
     click_button_by_id(appium_driver, "ru.adengi:id/buttonNext")
     click_button_by_id(appium_driver, "ru.adengi:id/acceptButton")
     click_button_by_id(appium_driver, "com.android.permissioncontroller:id/permission_allow_button")
+    slider_and_text_match(appium_driver)
     click_button_by_id(appium_driver, "ru.adengi:id/buttonGetMoney")
     click_button_by_id(appium_driver, "ru.adengi:id/editTextPhone")
 
