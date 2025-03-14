@@ -15,6 +15,11 @@ import time
 from appium import webdriver
 from appium.webdriver.common.appiumby import AppiumBy
 from selenium.common.exceptions import TimeoutException
+from selenium.webdriver import ActionChains
+from selenium.webdriver.common.actions.interaction import KEY
+from selenium.webdriver.common.actions.pointer_input import PointerInput
+from selenium.webdriver.common.actions.action_builder import ActionBuilder
+from selenium.webdriver.common.by import By
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -180,7 +185,92 @@ def delete_app(appium_driver):
     except WebDriverException as e:
         print(f"Не удалось удалить приложение '{package_to_remove}'. Ошибка: {e}")
 
+import pytest
+from appium import webdriver
+from selenium.webdriver.common.actions.action_builder import ActionBuilder
+from selenium.webdriver.common.actions.pointer_input import PointerInput
 
+@pytest.fixture(scope="module")
+def driver():
+    desired_caps = {
+        "platformName": "Android",
+        "deviceName": "emulator-5554",
+        "appPackage": "your.app.package",
+        "appActivity": "your.app.activity",
+        "automationName": "UiAutomator2"
+    }
+    driver = webdriver.Remote("http://localhost:4723/wd/hub", desired_caps)
+    yield driver
+    driver.quit()
+
+
+def test_slider_and_text_match(appium_driver):
+    wait = WebDriverWait(appium_driver, 10)
+
+    # Выбираем именно SeekBar (ползунок), исключая ProgressBar
+    slider = wait.until(EC.presence_of_element_located((
+        By.XPATH, '//android.widget.SeekBar[@content-desc and contains(@content-desc, "Value")]'
+    )))
+
+    text_element = wait.until(EC.presence_of_element_located((
+        By.XPATH, '//android.widget.TextView[@resource-id="ru.adengi:id/textReturnSumDiscounted"]'
+    )))
+
+    min_value = 2000
+    max_value = 30000
+    step = 500
+    num_steps = (max_value - min_value) // step
+
+    start_x = slider.location['x']
+    start_y = slider.location['y']
+    width = slider.size['width']
+    step_size = width / num_steps  # Длина одного шага
+
+    # Получаем текущее значение ползунка
+    content_desc = slider.get_attribute("content-desc")
+    print(f"DEBUG: content-desc = {content_desc}")
+
+    if not content_desc or content_desc.lower() == "null":
+        raise ValueError("Ошибка: content-desc отсутствует или пустой!")
+
+    try:
+        current_value = int(content_desc.split(", ")[1])
+    except (IndexError, ValueError):
+        raise ValueError(f"Ошибка: не удалось извлечь число из content-desc. Получено: {content_desc}")
+
+    print(f"DEBUG: Current value = {current_value}")
+
+    # Двигаем ползунок к минимальному значению, если он не на 2000
+    while current_value > min_value:
+        actions = ActionChains(appium_driver)
+        actions.drag_and_drop_by_offset(slider, -step_size, 0).perform()
+        time.sleep(0.3)  # Даем время UI обновиться
+        current_value = get_slider_value()
+
+    assert current_value == min_value, f"Expected {min_value}, but got {current_value}"
+
+    # Двигаем ползунок вперед по шагам
+    for i in range(1, num_steps + 1):
+        target_x = step_size * i
+
+        actions = ActionChains(appium_driver)
+        actions.drag_and_drop_by_offset(slider, target_x, 0).perform()
+        appium_driver.implicitly_wait(1)
+
+        # Проверяем текущее значение слайдера
+        content_desc = slider.get_attribute("content-desc")
+        try:
+            current_value = int(content_desc.split(", ")[1])
+        except (IndexError, ValueError):
+            current_value = int(content_desc)
+
+        expected_value = min_value + step * i
+        assert current_value == expected_value, f"Expected {expected_value}, but got {current_value}"
+
+        # Проверяем текстовое поле
+        displayed_text = text_element.text.replace(" ", "").replace("₽", "")
+        assert int(
+            displayed_text) == current_value, f"Text mismatch: expected {current_value}, but got {displayed_text}"
 # Тест 1. Регистрация
 def test_field_value_edit(appium_driver):
     wait = WebDriverWait(appium_driver, 10)
@@ -673,629 +763,6 @@ def test_take(appium_driver):
         print('Тест упал')
 
     click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-
-    go_to_home(appium_driver)
-
-    # Удалить приложение
-    delete_app(appium_driver)
-
-
-# 7. Тест Кп
-
-def test_kp(appium_driver):
-    wait = WebDriverWait(appium_driver, 30)
-
-    # 1. Клики
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonSkip")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonNext")
-    click_button_by_id(appium_driver, "ru.adengi:id/acceptButton")
-    click_button_by_id(appium_driver, "com.android.permissioncontroller:id/permission_allow_button")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonGetMoney")
-
-    wait.until(EC.presence_of_element_located((AppiumBy.ID, TEXT_FIELD_PXOME)))
-
-    swipe_bottom_to_top(appium_driver)
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-    wait.until(EC.presence_of_element_located((AppiumBy.ID, "ru.adengi:id/buttonContinue")))
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-
-    wait.until(EC.presence_of_element_located((AppiumBy.ID, "ru.adengi:id/editTextPassportNumber")))
-    swipe_bottom_to_top(appium_driver)
-
-    xpath_button = wait.until(EC.presence_of_element_located(
-        (AppiumBy.XPATH, '//android.widget.Button[@resource-id="ru.adengi:id/continueButton"]')))
-    sleep(0.5)
-    xpath_button.click()
-
-    wait.until(EC.presence_of_element_located((AppiumBy.ID, 'ru.adengi:id/editTextRegion')))
-    swipe_bottom_to_top(appium_driver)
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonAction")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonIdentificationMethod")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonAdd")
-
-    wait.until(EC.presence_of_element_located((AppiumBy.XPATH, '//android.view.View[@text="Номер карты"]')))
-    swipe_bottom_to_top(appium_driver)
-
-    # 2. Номер карты
-    field_сс = wait.until(EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.EditText[@resource-id="cc"]')))
-    field_сс.click()
-    type_text_by_xpath(appium_driver, xpath_cc, text_field)
-
-    # 3. Месяц
-    field_month = wait.until(
-        EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.EditText[@resource-id="month"]')))
-    field_month.click()
-    appium_driver.press_keycode(8)
-    appium_driver.press_keycode(8)
-
-    # 4. Год
-    field_year = wait.until(
-        EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.EditText[@resource-id="year"]')))
-    field_year.click()
-    appium_driver.press_keycode(9)
-    appium_driver.press_keycode(12)
-
-    # 5. CVV
-    field_cvv = wait.until(
-        EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.EditText[@resource-id="cvc"]')))
-    field_cvv.click()
-    type_text_by_xpath(appium_driver, xpath_cvv, text_cvv)
-
-    # 6. Кнопка "Продолжить"
-    button_next = wait.until(
-        EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.Button[@text="Продолжить"]')))
-    button_next.click()
-
-    # 7. КП
-
-    # попап страхофка
-
-    button_insurance = wait.until(EC.element_to_be_clickable((AppiumBy.XPATH,
-                                                              '//android.widget.RadioButton[@resource-id="ru.adengi:id/radioInsuranceTitle" and @text="С защитой финансов"]')))
-    button_insurance.click()
-
-    swipe_bottom_to_top(appium_driver)
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonGetMoney")
-
-    text = wait.until(
-        EC.presence_of_element_located((AppiumBy.XPATH, '//android.widget.TextView[@text="Подписание договора"]')))
-
-    print(text.text)
-    if text.text == 'Подписание договора':
-        print('Всё норм')
-    else:
-        print('Что-то пошло не так')
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonSmsSign")
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-
-    text_success = wait.until(EC.presence_of_element_located(
-        (AppiumBy.XPATH, '//android.widget.TextView[@resource-id="ru.adengi:id/textTitle"]')))
-
-    print(text_success.text)
-    if text_success.text == 'Заём успешно оформлен':
-        print('Тест успешно пройден')
-    else:
-        print('Тест упал')
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-
-    go_to_home(appium_driver)
-
-    # Удалить приложение
-    delete_app(appium_driver)
-
-
-# 8. Погашение займа
-
-def test_repayments(appium_driver):
-    wait = WebDriverWait(appium_driver, 30)
-
-    # 1. Клики
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonSkip")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonNext")
-    click_button_by_id(appium_driver, "ru.adengi:id/acceptButton")
-    click_button_by_id(appium_driver, "com.android.permissioncontroller:id/permission_allow_button")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonGetMoney")
-
-    wait.until(EC.presence_of_element_located((AppiumBy.ID, TEXT_FIELD_PXOME)))
-
-    swipe_bottom_to_top(appium_driver)
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-    wait.until(EC.presence_of_element_located((AppiumBy.ID, "ru.adengi:id/buttonContinue")))
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-
-    wait.until(EC.presence_of_element_located((AppiumBy.ID, "ru.adengi:id/editTextPassportNumber")))
-    swipe_bottom_to_top(appium_driver)
-
-    xpath_button = wait.until(EC.presence_of_element_located(
-        (AppiumBy.XPATH, '//android.widget.Button[@resource-id="ru.adengi:id/continueButton"]')))
-    sleep(0.5)
-    xpath_button.click()
-
-    wait.until(EC.presence_of_element_located((AppiumBy.ID, 'ru.adengi:id/editTextRegion')))
-    swipe_bottom_to_top(appium_driver)
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonAction")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonIdentificationMethod")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonAdd")
-
-    wait.until(EC.presence_of_element_located((AppiumBy.XPATH, '//android.view.View[@text="Номер карты"]')))
-    swipe_bottom_to_top(appium_driver)
-
-    # 2. Номер карты
-    field_сс = wait.until(EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.EditText[@resource-id="cc"]')))
-    field_сс.click()
-    type_text_by_xpath(appium_driver, xpath_cc, text_field)
-
-    # 3. Месяц
-    field_month = wait.until(
-        EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.EditText[@resource-id="month"]')))
-    field_month.click()
-    appium_driver.press_keycode(8)
-    appium_driver.press_keycode(8)
-
-    # 4. Год
-    field_year = wait.until(
-        EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.EditText[@resource-id="year"]')))
-    field_year.click()
-    appium_driver.press_keycode(9)
-    appium_driver.press_keycode(12)
-
-    # 5. CVV
-    field_cvv = wait.until(
-        EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.EditText[@resource-id="cvc"]')))
-    field_cvv.click()
-    type_text_by_xpath(appium_driver, xpath_cvv, text_cvv)
-
-    # 6. Кнопка "Продолжить"
-    button_next = wait.until(
-        EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.Button[@text="Продолжить"]')))
-    button_next.click()
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-
-    button_insurance = wait.until(EC.element_to_be_clickable((AppiumBy.XPATH,
-                                                              '//android.widget.RadioButton[@resource-id="ru.adengi:id/radioInsuranceTitle" and @text="С защитой финансов"]')))
-    button_insurance.click()
-
-    swipe_bottom_to_top(appium_driver)
-
-    wait.until(EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/buttonGetMoney')))
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonGetMoney")
-
-    dogovor_id = wait.until(EC.element_to_be_clickable((AppiumBy.ID, "ru.adengi:id/buttonSmsSign")))
-    sleep(1)
-    dogovor_id.click()
-
-    xpath_next = wait.until(EC.element_to_be_clickable(
-        (AppiumBy.XPATH, '//android.widget.Button[@resource-id="ru.adengi:id/buttonContinue"]')))
-    sleep(0.5)
-    xpath_next.click()
-
-    xpath_main = wait.until(EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/buttonContinue')))
-    sleep(0.5)
-    xpath_main.click()
-
-    click_button_by_id(appium_driver, "ru.adengi:id/estimateButton")
-
-    # 7. Погашение займа
-    wait.until(EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/buttonPay')))
-    sleep(2)
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonPay")
-
-    field_payment = wait.until(EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/editTextRuble')))
-    field_payment.click()
-
-    field_payment_text = field_payment.text
-    field_payment.clear()
-    field_payment.send_keys(field_payment_text)
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonPay")
-
-    xpath_choose = wait.until(EC.element_to_be_clickable(
-        (AppiumBy.XPATH, '(//android.widget.Button[@resource-id="ru.adengi:id/buttonSelect"])')))
-    xpath_choose.click()
-
-    field_number = wait.until(EC.element_to_be_clickable((AppiumBy.XPATH,
-                                                          '//android.view.View[@resource-id="paymentType1"]/android.view.View[1]/android.view.View[1]/android.widget.EditText')))
-    field_number.click()
-    type_text_by_xpath(appium_driver, xpath_number, text_field)
-
-    # 3. Месяц
-    field_month = wait.until(EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.EditText[@text="ММ"]')))
-    field_month.click()
-    appium_driver.press_keycode(8)
-    appium_driver.press_keycode(8)
-
-    # 4. Год
-    field_year = wait.until(EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.EditText[@text="ГГ"]')))
-    field_year.click()
-    appium_driver.press_keycode(9)
-    appium_driver.press_keycode(12)
-
-    # 5. CVV
-    field_cvv = wait.until(
-        EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.EditText[@resource-id="cvc"]')))
-    field_cvv.click()
-    type_text_by_xpath(appium_driver, xpath_cvv, text_cvv)
-
-    button_next = wait.until(
-        EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.Button[@text="Продолжить"]')))
-    button_next.click()
-
-    button_insurance = wait.until(EC.element_to_be_clickable((AppiumBy.XPATH,
-                                                              '//android.widget.RadioButton[@resource-id="ru.adengi:id/radioInsuranceTitle" and @text="С защитой финансов"]')))
-    button_insurance.click()
-
-    swipe_bottom_to_top(appium_driver)
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonGetMoney")
-
-    text = wait.until(
-        EC.presence_of_element_located((AppiumBy.XPATH, '//android.widget.TextView[@text="Подписание договора"]')))
-
-    print(text.text)
-    if text.text == 'Подписание договора':
-        print('Всё норм')
-    else:
-        print('Что-то пошло не так')
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonSmsSign")
-
-    # Проверка на успех погашения
-
-    text_replay = wait.until(EC.presence_of_element_located((AppiumBy.XPATH,
-                                                             '//android.widget.TextView[@resource-id="ru.adengi:id/textTitle" and @text="Оплата прошла успешно"]')))
-
-    print(text_replay.text)
-    if text_replay.text == 'Оплата прошла успешно':
-        print('Тест успешно пройден')
-    else:
-        print('Тест упал')
-
-    button_next_1 = wait.until(EC.presence_of_element_located(
-        (AppiumBy.XPATH, '//android.widget.Button[@resource-id="ru.adengi:id/buttonContinue"]')))
-    button_next_1.click()
-
-    go_to_home(appium_driver)
-
-    # Удалить приложение
-    delete_app(appium_driver)
-
-
-# 9. Повторный пользователь
-
-def test_replay(appium_driver):
-    wait = WebDriverWait(appium_driver, 30)
-
-    # 1. Клики
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonSkip")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonNext")
-    click_button_by_id(appium_driver, "ru.adengi:id/acceptButton")
-    click_button_by_id(appium_driver, "com.android.permissioncontroller:id/permission_allow_button")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonGetMoney")
-
-    wait.until(EC.presence_of_element_located((AppiumBy.ID, TEXT_FIELD_PXOME)))
-
-    swipe_bottom_to_top(appium_driver)
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-    wait.until(EC.presence_of_element_located((AppiumBy.ID, "ru.adengi:id/buttonContinue")))
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-
-    wait.until(EC.presence_of_element_located((AppiumBy.ID, "ru.adengi:id/editTextPassportNumber")))
-    swipe_bottom_to_top(appium_driver)
-
-    xpath_button = wait.until(EC.presence_of_element_located(
-        (AppiumBy.XPATH, '//android.widget.Button[@resource-id="ru.adengi:id/continueButton"]')))
-    sleep(0.5)
-    xpath_button.click()
-
-    wait.until(EC.presence_of_element_located((AppiumBy.ID, 'ru.adengi:id/editTextRegion')))
-    swipe_bottom_to_top(appium_driver)
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonAction")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonIdentificationMethod")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonAdd")
-
-    wait.until(EC.presence_of_element_located((AppiumBy.XPATH, '//android.view.View[@text="Номер карты"]')))
-    swipe_bottom_to_top(appium_driver)
-
-    # 2. Номер карты
-    field_сс = wait.until(EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.EditText[@resource-id="cc"]')))
-    field_сс.click()
-    type_text_by_xpath(appium_driver, xpath_cc, text_field)
-
-    # 3. Месяц
-    field_month = wait.until(
-        EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.EditText[@resource-id="month"]')))
-    field_month.click()
-    appium_driver.press_keycode(8)
-    appium_driver.press_keycode(8)
-
-    # 4. Год
-    field_year = wait.until(
-        EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.EditText[@resource-id="year"]')))
-    field_year.click()
-    appium_driver.press_keycode(9)
-    appium_driver.press_keycode(12)
-
-    # 5. CVV
-    field_cvv = wait.until(
-        EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.EditText[@resource-id="cvc"]')))
-    field_cvv.click()
-    type_text_by_xpath(appium_driver, xpath_cvv, text_cvv)
-
-    # 6. Кнопка "Продолжить"
-    button_next = wait.until(
-        EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.Button[@text="Продолжить"]')))
-    button_next.click()
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-
-    button_insurance = wait.until(EC.element_to_be_clickable((AppiumBy.XPATH,
-                                                              '//android.widget.RadioButton[@resource-id="ru.adengi:id/radioInsuranceTitle" and @text="С защитой финансов"]')))
-    button_insurance.click()
-
-    swipe_bottom_to_top(appium_driver)
-
-    wait.until(EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/buttonGetMoney')))
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonGetMoney")
-
-    dogovor_id = wait.until(EC.element_to_be_clickable((AppiumBy.ID, "ru.adengi:id/buttonSmsSign")))
-    sleep(1)
-    dogovor_id.click()
-
-    xpath_next = wait.until(EC.element_to_be_clickable(
-        (AppiumBy.XPATH, '//android.widget.Button[@resource-id="ru.adengi:id/buttonContinue"]')))
-    sleep(0.5)
-    xpath_next.click()
-
-    wait.until(EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/buttonContinue')))
-    xpath_main = wait.until(EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/buttonContinue')))
-    sleep(1)
-    xpath_main.click()
-
-    click_button_by_id(appium_driver, "ru.adengi:id/estimateButton")
-
-    # 7. Погашение займа
-    wait.until(EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/buttonPay')))
-    sleep(2)
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonPay")
-
-    field_payment = wait.until(EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/editTextRuble')))
-    field_payment.click()
-
-    field_payment_text = field_payment.text
-    field_payment.clear()
-    field_payment.send_keys(field_payment_text)
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonPay")
-
-    xpath_choose = wait.until(EC.element_to_be_clickable(
-        (AppiumBy.XPATH, '(//android.widget.Button[@resource-id="ru.adengi:id/buttonSelect"])')))
-    xpath_choose.click()
-
-    field_number = wait.until(EC.element_to_be_clickable((AppiumBy.XPATH,
-                                                          '//android.view.View[@resource-id="paymentType1"]/android.view.View[1]/android.view.View[1]/android.widget.EditText')))
-    field_number.click()
-    type_text_by_xpath(appium_driver, xpath_number, text_field)
-
-    # 3. Месяц
-    field_month = wait.until(EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.EditText[@text="ММ"]')))
-    field_month.click()
-    appium_driver.press_keycode(8)
-    appium_driver.press_keycode(8)
-
-    # 4. Год
-    field_year = wait.until(EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.EditText[@text="ГГ"]')))
-    field_year.click()
-    appium_driver.press_keycode(9)
-    appium_driver.press_keycode(12)
-
-    # 5. CVV
-    field_cvv = wait.until(
-        EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.EditText[@resource-id="cvc"]')))
-    field_cvv.click()
-    type_text_by_xpath(appium_driver, xpath_cvv, text_cvv)
-
-    xpath_button_next = wait.until(
-        EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.Button[@text="Продолжить"]')))
-    xpath_button_next.click()
-
-    xpath_next = wait.until(EC.element_to_be_clickable(
-        (AppiumBy.XPATH, '//android.widget.Button[@resource-id="ru.adengi:id/buttonContinue"]')))
-    sleep(0.5)
-    xpath_next.click()
-
-    # xpath_main = wait.until(EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/buttonContinue')))
-    # sleep(0.5)
-    # xpath_main.click()
-
-    swipe_bottom_to_top(appium_driver)
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonGetMoney")
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonSmsSign")
-
-    # Повторный займ
-
-    click_button_by_id(appium_driver, 'ru.adengi:id/buttonGetMoney')
-
-    click_button_by_id(appium_driver, 'ru.adengi:id/buttonSelect')
-
-    button_insurance = wait.until(EC.element_to_be_clickable((AppiumBy.XPATH,
-                                                              '//android.widget.RadioButton[@resource-id="ru.adengi:id/radioInsuranceTitle" and @text="С защитой финансов"]')))
-    button_insurance.click()
-
-    swipe_bottom_to_top(appium_driver)
-
-    wait.until(EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/buttonGetMoney')))
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonGetMoney")
-
-    dogovor_id = wait.until(EC.element_to_be_clickable((AppiumBy.ID, "ru.adengi:id/buttonSmsSign")))
-    sleep(1)
-    dogovor_id.click()
-
-    xpath_next = wait.until(EC.element_to_be_clickable(
-        (AppiumBy.XPATH, '//android.widget.Button[@resource-id="ru.adengi:id/buttonContinue"]')))
-    sleep(0.5)
-    xpath_next.click()
-
-    wait.until(EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/buttonContinue')))
-    xpath_main = wait.until(EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/buttonContinue')))
-    sleep(1)
-    xpath_main.click()
-
-    click_button_by_id(appium_driver, "ru.adengi:id/estimateButton")
-
-    dogovor_id = wait.until(EC.element_to_be_clickable((AppiumBy.ID, "ru.adengi:id/buttonSmsSign")))
-    sleep(1)
-    dogovor_id.click()
-
-    xpath_next = wait.until(EC.element_to_be_clickable(
-        (AppiumBy.XPATH, '//android.widget.Button[@resource-id="ru.adengi:id/buttonContinue"]')))
-    sleep(0.5)
-    xpath_next.click()
-
-    wait.until(EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/buttonContinue')))
-    xpath_main = wait.until(EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/buttonContinue')))
-    sleep(1)
-    xpath_main.click()
-
-    # Проверка на повторный заём
-
-    text_activiti = wait.until(
-        EC.presence_of_element_located((AppiumBy.XPATH, '//android.widget.TextView[@text="Активный заём"]')))
-
-    print(text_activiti.text)
-    if text_activiti.text == 'Активный заём':
-        print('Тест успешно пройден')
-    else:
-        print('Тест упал')
-
-    go_to_home(appium_driver)
-
-    # Удалить приложение
-    delete_app(appium_driver)
-
-
-# Востановление пароля
-
-def test_recovery(appium_driver):
-    wait = WebDriverWait(appium_driver, 30)
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonSkip")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonNext")
-    click_button_by_id(appium_driver, "ru.adengi:id/acceptButton")
-    click_button_by_id(appium_driver, "com.android.permissioncontroller:id/permission_allow_button")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonGetMoney")
-
-    wait.until(EC.presence_of_element_located((AppiumBy.ID, TEXT_FIELD_PXOME)))
-
-    swipe_bottom_to_top(appium_driver)
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonContinue")
-
-    xpath_next = wait.until(EC.element_to_be_clickable(
-        (AppiumBy.XPATH, '//android.widget.Button[@resource-id="ru.adengi:id/buttonContinue"]')))
-    xpath_next.click()
-
-    wait.until(EC.element_to_be_clickable((AppiumBy.XPATH, '(//android.widget.TextView[@text="Паспорт"])')))
-    appium_driver.press_keycode(4)
-
-    click_button_by_id(appium_driver, "android:id/button1")
-
-    click_button_by_id(appium_driver, "ru.adengi:id/nav_menu")
-    # xpath_menu = wait.until(EC.element_to_be_clickable((AppiumBy.XPATH, '//android.widget.ImageView[@resource-id="ru.adengi:id/navigation_bar_item_icon_view"]')))
-    # xpath_menu.click()
-
-    xpath_lk = wait.until(EC.element_to_be_clickable(
-        (AppiumBy.XPATH, '//android.widget.LinearLayout[@resource-id="ru.adengi:id/layoutText"]')))
-    xpath_lk.click()
-
-    xpath_passworld = wait.until(EC.element_to_be_clickable((AppiumBy.XPATH,
-                                                             '//androidx.recyclerview.widget.RecyclerView[@resource-id="ru.adengi:id/profileRecyclerView"]/android.view.ViewGroup[2]')))
-    xpath_passworld.click()
-
-    xpath_field_passworld = wait.until(EC.element_to_be_clickable(
-        (AppiumBy.XPATH, '(//android.widget.EditText[@resource-id="ru.adengi:id/editTextPassword"])[1]')))
-    xpath_field_passworld.click()
-    xpath_field_passworld.send_keys(123456)
-
-    xpath_field_passworld_top = wait.until(EC.element_to_be_clickable(
-        (AppiumBy.XPATH, '(//android.widget.EditText[@resource-id="ru.adengi:id/editTextPassword"])[2]')))
-    xpath_field_passworld_top.click()
-    xpath_field_passworld_top.send_keys(123456)
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonSavePassword")
-
-    go_to_home(appium_driver)
-
-    # Удалить приложение
-    delete_app(appium_driver)
-
-
-# Проверка авторизации
-
-def test_authorization(appium_driver):
-    wait = WebDriverWait(appium_driver, 30)
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonSkip")
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonNext")
-    click_button_by_id(appium_driver, "ru.adengi:id/acceptButton")
-    click_button_by_id(appium_driver, "com.android.permissioncontroller:id/permission_allow_button")
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonLogin")
-
-    fieled_pxon = wait.until(EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/editTextPhone')))
-    fieled_pxon.click()
-    fieled_pxon.clear()
-    # phone_number = "9604336846"
-    appium_driver.press_keycode(16)
-    appium_driver.press_keycode(13)
-    appium_driver.press_keycode(7)
-    appium_driver.press_keycode(11)
-    appium_driver.press_keycode(10)
-    appium_driver.press_keycode(10)
-    appium_driver.press_keycode(13)
-    appium_driver.press_keycode(15)
-    appium_driver.press_keycode(11)
-    appium_driver.press_keycode(13)
-
-    fieled_passwold = wait.until(EC.element_to_be_clickable((AppiumBy.ID, 'ru.adengi:id/editTextPassword')))
-    fieled_passwold.click()
-    fieled_passwold.clear()
-    fieled_passwold.send_keys(123456)
-
-    click_button_by_id(appium_driver, "ru.adengi:id/buttonEnter")
-
-    # Проверка на наличие поля "Уведомление" т.к. оно появляется только у авторизованного пользователя
-
-    text_notification = wait.until(EC.presence_of_element_located((AppiumBy.XPATH,
-                                                                   '//android.widget.TextView[@resource-id="ru.adengi:id/navigation_bar_item_small_label_view" and @text="Уведомления"]')))
-
-    print(text_notification.text)
-    if text_notification.text == 'Уведомления':
-        print('Тест успешно пройден')
-    else:
-        print('Тест упал')
 
     go_to_home(appium_driver)
 
