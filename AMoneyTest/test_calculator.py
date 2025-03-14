@@ -204,7 +204,7 @@ def driver():
     driver.quit()
 
 
-def test_slider_and_text_match(appium_driver):
+def slider_and_text_match(appium_driver):
     wait = WebDriverWait(appium_driver, 10)
 
     # Выбираем именно SeekBar (ползунок), исключая ProgressBar
@@ -271,7 +271,7 @@ def test_slider_and_text_match(appium_driver):
         # Передвигаем ползунок на move_by_pixels пикселей вправо
         actions = ActionChains(appium_driver)
         actions.click_and_hold(slider).move_by_offset(move_by_pixels, 0).release().perform()
-        time.sleep(0.5)  # Даем UI обновиться
+        time.sleep(0.3)  # Даем UI обновиться
 
         # Получаем новое значение
         content_desc = slider.get_attribute("content-desc")
@@ -298,6 +298,7 @@ def test_field_value_edit(appium_driver):
     click_button_by_id(appium_driver, "ru.adengi:id/buttonNext")
     click_button_by_id(appium_driver, "ru.adengi:id/acceptButton")
     click_button_by_id(appium_driver, "com.android.permissioncontroller:id/permission_allow_button")
+    slider_and_text_match(appium_driver)
     click_button_by_id(appium_driver, "ru.adengi:id/buttonGetMoney")
     click_button_by_id(appium_driver, "ru.adengi:id/editTextPhone")
 
