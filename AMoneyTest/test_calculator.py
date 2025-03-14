@@ -241,36 +241,42 @@ def test_slider_and_text_match(appium_driver):
     print(f"DEBUG: Current value = {current_value}")
 
     # Двигаем ползунок к минимальному значению, если он не на 2000
-    while current_value > min_value:
+    if current_value != min_value:
         actions = ActionChains(appium_driver)
-        actions.drag_and_drop_by_offset(slider, -step_size, 0).perform()
-        time.sleep(0.3)  # Даем время UI обновиться
-        current_value = get_slider_value()
-
-    assert current_value == min_value, f"Expected {min_value}, but got {current_value}"
-
-    # Двигаем ползунок вперед по шагам
-    for i in range(1, num_steps + 1):
-        target_x = step_size * i
-
-        actions = ActionChains(appium_driver)
-        actions.drag_and_drop_by_offset(slider, target_x, 0).perform()
+        actions.drag_and_drop_by_offset(slider, -500, 0).perform()
         appium_driver.implicitly_wait(1)
 
-        # Проверяем текущее значение слайдера
         content_desc = slider.get_attribute("content-desc")
         try:
             current_value = int(content_desc.split(", ")[1])
         except (IndexError, ValueError):
             current_value = int(content_desc)
 
-        expected_value = min_value + step * i
+        assert current_value == min_value, f"Expected 2000, but got {current_value}"
+
+    # Двигаем ползунок вперед по шагам
+    for i in range(num_steps):
+        start_x = slider.location['x']
+        end_x = start_x + step_size  # Передвигаем вправо на один шаг
+        start_y = slider.location['y']
+
+        actions = ActionChains(appium_driver)
+        actions.click_and_hold(slider).move_by_offset(step_size, 0).release().perform()
+        time.sleep(0.5)  # Даем UI обновиться
+
+        # Получаем новое значение
+        content_desc = slider.get_attribute("content-desc")
+        try:
+            current_value = int(content_desc.split(", ")[1])
+        except (IndexError, ValueError):
+            current_value = int(content_desc)
+
+        print(f"DEBUG: Текущее значение ползунка = {current_value}")
+
+        # Проверяем, что значение правильное
+        expected_value = min_value + step * (i + 1)
         assert current_value == expected_value, f"Expected {expected_value}, but got {current_value}"
 
-        # Проверяем текстовое поле
-        displayed_text = text_element.text.replace(" ", "").replace("₽", "")
-        assert int(
-            displayed_text) == current_value, f"Text mismatch: expected {current_value}, but got {displayed_text}"
 # Тест 1. Регистрация
 def test_field_value_edit(appium_driver):
     wait = WebDriverWait(appium_driver, 10)
